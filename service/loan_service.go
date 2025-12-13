@@ -9,12 +9,15 @@ import (
 )
 
 type LoanService struct {
-	repo repository.LoanRepository
+	repo  repository.LoanRepository
+	cache repository.CacheRepository
 }
 
 // NewLoanService creates a new LoanService with the given repository.
-func NewLoanService(repo repository.LoanRepository) *LoanService {
-	return &LoanService{repo: repo}
+func NewLoanService(repo repository.LoanRepository,
+	cache repository.CacheRepository,
+) *LoanService {
+	return &LoanService{repo: repo, cache: cache}
 }
 
 // CalculateLoan calculates the loan details based on the input parameters.
