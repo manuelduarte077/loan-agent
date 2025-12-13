@@ -21,6 +21,12 @@ func main() {
 
 	loanHandler := httpLayer.NewLoanHandler(loanService)
 
+	termRecommendationService := service.NewTermRecommendationService(loanService)
+	termRecommendationHandler := httpLayer.NewTermRecommendationHandler(termRecommendationService)
+
+	debtExitService := service.NewDebtExitService(loanService)
+	debtExitHandler := httpLayer.NewDebtExitHandler(debtExitService)
+
 	rateLimiter := httpLayer.NewRateLimiter(5, time.Minute)
 
 	http.Handle(
@@ -28,6 +34,22 @@ func main() {
 		httpLayer.RateLimitMiddleware(
 			rateLimiter,
 			http.HandlerFunc(loanHandler.CalculateLoan),
+		),
+	)
+
+	http.Handle(
+		"/loan/recommend-term",
+		httpLayer.RateLimitMiddleware(
+			rateLimiter,
+			http.HandlerFunc(termRecommendationHandler.RecommendTerm),
+		),
+	)
+
+	http.Handle(
+		"/loan/debt-exit-plan",
+		httpLayer.RateLimitMiddleware(
+			rateLimiter,
+			http.HandlerFunc(debtExitHandler.CalculateDebtExitPlan),
 		),
 	)
 
