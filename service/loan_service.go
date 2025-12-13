@@ -8,6 +8,11 @@ import (
 	"loan-agent/repository"
 )
 
+// roundTo2Decimals redondea un float64 a 2 decimales
+func roundTo2Decimals(value float64) float64 {
+	return math.Round(value*100) / 100
+}
+
 type LoanService struct {
 	repo  repository.LoanRepository
 	cache repository.CacheRepository
@@ -52,9 +57,9 @@ func (s *LoanService) CalculateLoan(
 	intereses := total - input.Amount
 
 	result := domain.LoanResult{
-		MonthlyPayment: cuota,
-		TotalPayment:   total,
-		TotalInterest:  intereses,
+		MonthlyPayment: roundTo2Decimals(cuota),
+		TotalPayment:   roundTo2Decimals(total),
+		TotalInterest:  roundTo2Decimals(intereses),
 	}
 
 	// Guardar el resultado
