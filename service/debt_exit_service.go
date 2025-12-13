@@ -10,10 +10,14 @@ import (
 
 type DebtExitService struct {
 	loanService *LoanService
+	aiService   *AIService
 }
 
 func NewDebtExitService(loanService *LoanService) *DebtExitService {
-	return &DebtExitService{loanService: loanService}
+	return &DebtExitService{
+		loanService: loanService,
+		aiService:   NewAIService(),
+	}
 }
 
 // CalculateDebtExitPlan calcula el plan de salida de deudas usando snowball o avalanche
@@ -90,6 +94,53 @@ func (s *DebtExitService) CalculateDebtExitPlan(
 	} else {
 		result = s.calculateStrategy(input, input.Strategy)
 	}
+
+	// Generar explicación inteligente con IA
+	debtInfo := make([]struct {
+		Name         string
+		Amount       float64
+		InterestRate float64
+	}, len(input.Debts))
+	for i, debt := range input.Debts {
+		debtInfo[i] = struct {
+			Name         string
+			Amount       float64
+			InterestRate float64
+		}{
+			Name:         debt.Name,
+			Amount:       debt.Amount,
+			InterestRate: debt.InterestRate,
+		}
+	}
+
+	var comparisonData *struct {
+		SnowballInterest  float64
+		AvalancheInterest float64
+		InterestSaved     float64
+		MonthsSaved       int
+	}
+	if result.Comparison != nil {
+		comparisonData = &struct {
+			SnowballInterest  float64
+			AvalancheInterest float64
+			InterestSaved     float64
+			MonthsSaved       int
+		}{
+			SnowballInterest:  result.Comparison.Snowball.TotalInterestPaid,
+			AvalancheInterest: result.Comparison.Avalanche.TotalInterestPaid,
+			InterestSaved:     result.Comparison.Savings.InterestSaved,
+			MonthsSaved:       result.Comparison.Savings.MonthsSaved,
+		}
+	}
+
+	result.Explanation = s.aiService.GenerateDebtStrategyExplanation(
+		result.Strategy,
+		result.TotalDebt,
+		result.TotalInterestPaid,
+		result.MonthsToPayoff,
+		debtInfo,
+		comparisonData,
+	)
 
 	return result, nil
 }

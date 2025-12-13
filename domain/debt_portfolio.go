@@ -46,4 +46,5 @@ type DebtExitResult struct {
 	MonthsToPayoff    int
 	MonthlyPlan       []MonthlyPlan
 	Comparison        *Comparison `json:",omitempty"`
+	Explanation       string     `json:",omitempty"` // Explicación generada por IA
 }

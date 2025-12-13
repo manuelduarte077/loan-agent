@@ -9,10 +9,14 @@ import (
 
 type TermRecommendationService struct {
 	loanService *LoanService
+	aiService   *AIService
 }
 
 func NewTermRecommendationService(loanService *LoanService) *TermRecommendationService {
-	return &TermRecommendationService{loanService: loanService}
+	return &TermRecommendationService{
+		loanService: loanService,
+		aiService:   NewAIService(),
+	}
 }
 
 // RecommendTerm analiza diferentes plazos y recomienda el óptimo
@@ -79,16 +83,51 @@ func (s *TermRecommendationService) RecommendTerm(
 		})
 	}
 
-	if len(recommendations) == 0 {
-		return domain.TermRecommendationResult{}, errors.New("no se encontraron plazos válidos con el pago mensual máximo especificado")
-	}
-
 	// Ordenar por score descendente
 	sort.Slice(recommendations, func(i, j int) bool {
 		return recommendations[i].Score > recommendations[j].Score
 	})
 
+	if len(recommendations) == 0 {
+		return domain.TermRecommendationResult{}, errors.New("no se encontraron plazos válidos con el pago mensual máximo especificado")
+	}
+
 	recommendedTerm := recommendations[0].TermMonths
+
+	// Generar explicación inteligente con IA para la recomendación principal
+	topRecommendation := recommendations[0]
+	alternativeTerms := []struct {
+		Term           int
+		MonthlyPayment float64
+		TotalInterest  float64
+	}{}
+
+	// Agregar algunas alternativas para contexto
+	maxAlternatives := 3
+	for i := 1; i < len(recommendations) && i <= maxAlternatives; i++ {
+		alternativeTerms = append(alternativeTerms, struct {
+			Term           int
+			MonthlyPayment float64
+			TotalInterest  float64
+		}{
+			Term:           recommendations[i].TermMonths,
+			MonthlyPayment: recommendations[i].MonthlyPayment,
+			TotalInterest:  recommendations[i].TotalInterest,
+		})
+	}
+
+	aiExplanation := s.aiService.GenerateTermRecommendationExplanation(
+		input.Amount,
+		input.InterestRate,
+		topRecommendation.TermMonths,
+		topRecommendation.MonthlyPayment,
+		topRecommendation.TotalInterest,
+		input.Preference,
+		alternativeTerms,
+	)
+
+	// Actualizar la razón de la recomendación principal con la explicación de IA
+	recommendations[0].Reason = aiExplanation
 
 	return domain.TermRecommendationResult{
 		RecommendedTerm: recommendedTerm,
@@ -149,4 +188,3 @@ func (s *TermRecommendationService) generateReason(
 	}
 	return "Recomendación basada en los parámetros proporcionados"
 }
-
