@@ -2,6 +2,8 @@ package service
 
 import (
 	"errors"
+	"fmt"
+	"log"
 	"math"
 	"sort"
 
@@ -29,8 +31,23 @@ func (s *DebtExitService) CalculateDebtExitPlan(
 	if len(input.Debts) == 0 {
 		return domain.DebtExitResult{}, errors.New("no se proporcionaron deudas")
 	}
+	if len(input.Debts) > MaxDebtsPerRequest {
+		return domain.DebtExitResult{}, fmt.Errorf("número de deudas excede el máximo de %d", MaxDebtsPerRequest)
+	}
 	if input.AvailableMonthlyPayment <= 0 {
 		return domain.DebtExitResult{}, errors.New("pago mensual disponible inválido")
+	}
+
+	// Validar nombres únicos
+	debtNames := make(map[string]bool)
+	for _, debt := range input.Debts {
+		if debt.Name == "" {
+			return domain.DebtExitResult{}, errors.New("nombre de deuda no puede estar vacío")
+		}
+		if debtNames[debt.Name] {
+			return domain.DebtExitResult{}, fmt.Errorf("nombre de deuda duplicado: %s", debt.Name)
+		}
+		debtNames[debt.Name] = true
 	}
 
 	strategies := map[string]bool{
@@ -48,11 +65,22 @@ func (s *DebtExitService) CalculateDebtExitPlan(
 		if debt.Amount <= 0 {
 			return domain.DebtExitResult{}, errors.New("monto de deuda inválido")
 		}
+		if debt.Amount > MaxDebtAmount {
+			return domain.DebtExitResult{}, fmt.Errorf("monto de deuda excede el máximo de $%.2f", MaxDebtAmount)
+		}
 		if debt.InterestRate < 0 {
 			return domain.DebtExitResult{}, errors.New("tasa de interés inválida")
 		}
+		if debt.InterestRate > MaxInterestRate {
+			return domain.DebtExitResult{}, fmt.Errorf("tasa de interés excede el máximo de %.2f%%", MaxInterestRate)
+		}
 		if debt.MinimumPayment <= 0 {
 			return domain.DebtExitResult{}, errors.New("pago mínimo inválido")
+		}
+		// Validar que el pago mínimo sea razonable (al menos cubre el interés mensual)
+		monthlyInterest := debt.Amount * (debt.InterestRate / 100) / 12
+		if debt.MinimumPayment < monthlyInterest {
+			return domain.DebtExitResult{}, fmt.Errorf("pago mínimo de %s ($%.2f) es menor que el interés mensual ($%.2f)", debt.Name, debt.MinimumPayment, monthlyInterest)
 		}
 		totalMinimumPayments += debt.MinimumPayment
 	}
@@ -204,16 +232,22 @@ func (s *DebtExitService) calculateStrategy(
 			}
 
 			interest := interestMap[debt.Name]
-			// El pago mínimo debe ser al menos el interés más algo de capital
-			minRequiredPayment := interest
-			if debt.MinimumPayment > minRequiredPayment {
-				minRequiredPayment = debt.MinimumPayment
+			// El pago mínimo debe cubrir al menos el interés mensual
+			// Si el pago mínimo es menor que el interés, usar el interés como mínimo
+			minRequiredPayment := debt.MinimumPayment
+			if minRequiredPayment < interest {
+				minRequiredPayment = interest
 			}
 
+			// Calcular el pago máximo posible (balance + interés)
+			maxPossiblePayment := balances[debt.Name] + interest
+
+			// El pago debe ser al menos el mínimo requerido, pero no más del máximo posible
 			payment := minRequiredPayment
-			if payment > balances[debt.Name]+interest {
-				payment = balances[debt.Name] + interest
+			if payment > maxPossiblePayment {
+				payment = maxPossiblePayment
 			}
+			// No exceder el disponible
 			if payment > available {
 				payment = available
 			}
@@ -230,8 +264,8 @@ func (s *DebtExitService) calculateStrategy(
 				}
 
 				payments = append(payments, domain.MonthlyPayment{
-					DebtName:        debt.Name,
-					Payment:         roundTo2Decimals(payment),
+					DebtName:         debt.Name,
+					Payment:          roundTo2Decimals(payment),
 					RemainingBalance: roundTo2Decimals(balances[debt.Name]),
 				})
 
@@ -277,7 +311,7 @@ func (s *DebtExitService) calculateStrategy(
 		// Verificar si todas las deudas están pagadas
 		allPaid := true
 		for _, debt := range debts {
-			if balances[debt.Name] > 0.01 { // Tolerancia para errores de redondeo
+			if balances[debt.Name] > DebtBalanceTolerance {
 				allPaid = false
 				break
 			}
@@ -288,7 +322,8 @@ func (s *DebtExitService) calculateStrategy(
 		}
 
 		// Límite de seguridad para evitar loops infinitos
-		if month > 600 { // 50 años máximo
+		if month > MaxDebtPayoffMonths {
+			log.Printf("Warning: debt payoff calculation reached maximum months limit (%d)", MaxDebtPayoffMonths)
 			break
 		}
 	}
@@ -300,11 +335,10 @@ func (s *DebtExitService) calculateStrategy(
 	}
 
 	return domain.DebtExitResult{
-		Strategy:         strategy,
-		TotalDebt:        roundTo2Decimals(totalDebt),
+		Strategy:          strategy,
+		TotalDebt:         roundTo2Decimals(totalDebt),
 		TotalInterestPaid: roundTo2Decimals(totalInterestPaid),
-		MonthsToPayoff:   month,
-		MonthlyPlan:      monthlyPlan,
+		MonthsToPayoff:    month,
+		MonthlyPlan:       monthlyPlan,
 	}
 }
-

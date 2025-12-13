@@ -2,6 +2,8 @@ package service
 
 import (
 	"errors"
+	"fmt"
+	"log"
 	"math"
 
 	"loan-agent/domain"
@@ -34,11 +36,20 @@ func (s *LoanService) CalculateLoan(
 	if input.Amount <= 0 {
 		return domain.LoanResult{}, errors.New("monto inválido")
 	}
+	if input.Amount > MaxLoanAmount {
+		return domain.LoanResult{}, fmt.Errorf("monto excede el máximo permitido de $%.2f", MaxLoanAmount)
+	}
 	if input.InterestRate < 0 {
 		return domain.LoanResult{}, errors.New("tasa inválida")
 	}
+	if input.InterestRate > MaxInterestRate {
+		return domain.LoanResult{}, fmt.Errorf("tasa de interés excede el máximo permitido de %.2f%%", MaxInterestRate)
+	}
 	if input.TermMonths <= 0 {
 		return domain.LoanResult{}, errors.New("plazo inválido")
+	}
+	if input.TermMonths > MaxTermMonths {
+		return domain.LoanResult{}, fmt.Errorf("plazo excede el máximo permitido de %d meses", MaxTermMonths)
 	}
 
 	var cuota float64
@@ -62,8 +73,10 @@ func (s *LoanService) CalculateLoan(
 		TotalInterest:  roundTo2Decimals(intereses),
 	}
 
-	// Guardar el resultado
-	_ = s.repo.Save(input, result)
+	// Guardar el resultado (no crítico si falla)
+	if err := s.repo.Save(input, result); err != nil {
+		log.Printf("Warning: failed to save loan calculation: %v", err)
+	}
 
 	return result, nil
 }

@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -81,6 +83,7 @@ Genera una explicación breve (2-3 oraciones) que explique por qué este plazo e
 
 	explanation, err := s.callLLM(prompt)
 	if err != nil {
+		log.Printf("Error calling AI service for term recommendation: %v", err)
 		return s.generateFallbackExplanation(recommendedTerm, monthlyPayment, totalInterest, preference)
 	}
 
@@ -128,6 +131,7 @@ Genera una explicación breve (3-4 oraciones) que explique la estrategia, los be
 
 	explanation, err := s.callLLM(prompt)
 	if err != nil {
+		log.Printf("Error calling AI service for debt strategy: %v", err)
 		return s.generateFallbackDebtExplanation(strategy, totalInterestPaid, monthsToPayoff)
 	}
 
@@ -171,7 +175,7 @@ func (s *AIService) callLLM(prompt string) (string, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("API error: %s", string(body))
+		return "", fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
 	}
 
 	var openAIResp OpenAIResponse
@@ -191,11 +195,14 @@ func (s *AIService) formatDebts(debts []struct {
 	Amount       float64
 	InterestRate float64
 }) string {
-	var result string
-	for _, debt := range debts {
-		result += fmt.Sprintf("- %s: $%.2f al %.2f%% anual\n", debt.Name, debt.Amount, debt.InterestRate)
+	if len(debts) == 0 {
+		return ""
 	}
-	return result
+	var result strings.Builder
+	for _, debt := range debts {
+		result.WriteString(fmt.Sprintf("- %s: $%.2f al %.2f%% anual\n", debt.Name, debt.Amount, debt.InterestRate))
+	}
+	return result.String()
 }
 
 func (s *AIService) formatComparison(comparison *struct {
@@ -207,12 +214,13 @@ func (s *AIService) formatComparison(comparison *struct {
 	if comparison == nil {
 		return ""
 	}
+	// Nota: Los meses se calculan separadamente en el servicio de deudas
 	return fmt.Sprintf(`Comparación:
-- Método Snowball: $%.2f en intereses, %d meses
-- Método Avalanche: $%.2f en intereses, %d meses
+- Método Snowball: $%.2f en intereses
+- Método Avalanche: $%.2f en intereses
 - Ahorro con Avalanche: $%.2f y %d meses menos`,
-		comparison.SnowballInterest, 0, // meses calculados separadamente
-		comparison.AvalancheInterest, 0,
+		comparison.SnowballInterest,
+		comparison.AvalancheInterest,
 		comparison.InterestSaved, comparison.MonthsSaved)
 }
 

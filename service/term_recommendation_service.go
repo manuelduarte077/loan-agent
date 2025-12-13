@@ -2,6 +2,8 @@ package service
 
 import (
 	"errors"
+	"fmt"
+	"log"
 	"sort"
 
 	"loan-agent/domain"
@@ -37,6 +39,13 @@ func (s *TermRecommendationService) RecommendTerm(
 	if input.MinTermMonths > input.MaxTermMonths {
 		return domain.TermRecommendationResult{}, errors.New("plazo mínimo mayor que máximo")
 	}
+	if input.MaxTermMonths > MaxTermMonths {
+		return domain.TermRecommendationResult{}, fmt.Errorf("plazo máximo excede el límite de %d meses", MaxTermMonths)
+	}
+	// Validar que el rango no sea demasiado grande para evitar cálculos costosos
+	if input.MaxTermMonths-input.MinTermMonths > MaxTermRangeMonths {
+		return domain.TermRecommendationResult{}, fmt.Errorf("rango de plazos excede el máximo de %d meses", MaxTermRangeMonths)
+	}
 	if input.MaxMonthlyPayment <= 0 {
 		return domain.TermRecommendationResult{}, errors.New("pago mensual máximo inválido")
 	}
@@ -62,6 +71,7 @@ func (s *TermRecommendationService) RecommendTerm(
 
 		result, err := s.loanService.CalculateLoan(loanInput)
 		if err != nil {
+			log.Printf("Warning: failed to calculate loan for term %d: %v", term, err)
 			continue
 		}
 
