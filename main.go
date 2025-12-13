@@ -1,40 +1,36 @@
-package http
+package main
 
 import (
-	"encoding/json"
+	"log"
 	"net/http"
+	"time"
 
-	"loan-agent/domain"
+	httpLayer "loan-agent/http"
+	"loan-agent/repository"
 	"loan-agent/service"
 )
 
-type LoanHandler struct {
-	service *service.LoanService
-}
+func main() {
 
-func NewLoanHandler(service *service.LoanService) *LoanHandler {
-	return &LoanHandler{service: service}
-}
+	loanRepo := repository.NewLoanRepositoryMemory()
 
-func (h *LoanHandler) CalculateLoan(w http.ResponseWriter, r *http.Request) {
+	// cache := repository.NewRedisCache("localhost:6379")
+	cache := repository.NewMockCache()
 
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
+	loanService := service.NewLoanService(loanRepo, cache)
 
-	var input domain.LoanInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
+	loanHandler := httpLayer.NewLoanHandler(loanService)
 
-	result, err := h.service.CalculateLoan(input)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	rateLimiter := httpLayer.NewRateLimiter(5, time.Minute)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	http.Handle(
+		"/loan/calculate",
+		httpLayer.RateLimitMiddleware(
+			rateLimiter,
+			http.HandlerFunc(loanHandler.CalculateLoan),
+		),
+	)
+
+	log.Println("🚀 API corriendo en http://localhost:8080")
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
