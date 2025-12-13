@@ -66,25 +66,30 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// Manejar shutdown graceful
+	serverErr := make(chan error, 1)
 	go func() {
 		log.Println("🚀 API corriendo en http://localhost:8080")
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Error starting server: %v", err)
+			serverErr <- err
 		}
 	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
 
-	log.Println("Shutting down server...")
+	select {
+	case err := <-serverErr:
+		log.Printf("Error starting server: %v", err)
+		return
+	case <-quit:
+		log.Println("Shutting down server...")
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+		log.Printf("Error during server shutdown: %v", err)
 	}
 
 	log.Println("Server exited")

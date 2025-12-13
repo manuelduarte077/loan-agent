@@ -1,6 +1,7 @@
 package http
 
 import (
+	"bytes"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -45,11 +46,16 @@ func (h *DebtExitHandler) CalculateDebtExitPlan(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(result); err != nil {
+	// Codificar JSON en buffer primero para evitar escribir header si falla
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(result); err != nil {
 		log.Printf("Error encoding response: %v", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
-}
 
+	w.Header().Set("Content-Type", "application/json")
+	if _, err := buf.WriteTo(w); err != nil {
+		log.Printf("Error writing response: %v", err)
+	}
+}
