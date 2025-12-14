@@ -6,19 +6,18 @@ import (
 	"log"
 	"math"
 	"sort"
+	"strings"
 
 	"loan-agent/domain"
 )
 
 type DebtExitService struct {
 	loanService *LoanService
-	aiService   *AIService
 }
 
 func NewDebtExitService(loanService *LoanService) *DebtExitService {
 	return &DebtExitService{
 		loanService: loanService,
-		aiService:   NewAIService(),
 	}
 }
 
@@ -120,33 +119,14 @@ func (s *DebtExitService) CalculateDebtExitPlan(
 		result = s.calculateStrategy(input, input.Strategy)
 	}
 
-	// Generar explicación inteligente con IA
-	debtInfo := make([]DebtInfo, len(input.Debts))
-	for i, debt := range input.Debts {
-		debtInfo[i] = DebtInfo{
-			Name:         debt.Name,
-			Amount:       debt.Amount,
-			InterestRate: debt.InterestRate,
-		}
-	}
-
-	var comparisonData *StrategyComparison
-	if result.Comparison != nil {
-		comparisonData = &StrategyComparison{
-			SnowballInterest:  result.Comparison.Snowball.TotalInterestPaid,
-			AvalancheInterest: result.Comparison.Avalanche.TotalInterestPaid,
-			InterestSaved:     result.Comparison.Savings.InterestSaved,
-			MonthsSaved:       result.Comparison.Savings.MonthsSaved,
-		}
-	}
-
-	result.Explanation = s.aiService.GenerateDebtStrategyExplanation(
+	// Generar explicación
+	result.Explanation = s.generateDebtExplanation(
 		result.Strategy,
 		result.TotalDebt,
 		result.TotalInterestPaid,
 		result.MonthsToPayoff,
-		debtInfo,
-		comparisonData,
+		input.Debts,
+		result.Comparison,
 	)
 
 	return result, nil
@@ -313,4 +293,106 @@ func (s *DebtExitService) calculateStrategy(
 		MonthsToPayoff:    month,
 		MonthlyPlan:       monthlyPlan,
 	}
+}
+
+func (s *DebtExitService) generateDebtExplanation(
+	strategy string,
+	totalDebt, totalInterest float64,
+	months int,
+	debts []domain.Debt,
+	comparison *domain.Comparison,
+) string {
+	strategyName := "Snowball (Bola de Nieve)"
+	strategyTip := "Ideal si necesitas ver resultados rápidos para mantenerte motivado. Cada deuda pagada libera capital que puedes aplicar a la siguiente."
+	if strategy == "avalanche" {
+		strategyName = "Avalanche (Avalancha)"
+		strategyTip = "Ideal si tu objetivo principal es minimizar el costo financiero total. Requiere disciplina pero maximiza el ahorro."
+	}
+
+	totalCost := totalDebt + totalInterest
+	var builder strings.Builder
+
+	builder.WriteString(fmt.Sprintf("La estrategia %s te permitirá liquidar todas tus deudas en %d meses (%.1f años). ", strategyName, months, float64(months)/12.0))
+	builder.WriteString(fmt.Sprintf("Tu deuda inicial es %s y pagarás %s en intereses, para un costo total de %s. ",
+		formatCurrency(totalDebt), formatCurrency(totalInterest), formatCurrency(totalCost)))
+
+	// Orden de pago
+	sortedDebts := make([]domain.Debt, len(debts))
+	copy(sortedDebts, debts)
+	if strategy == "snowball" {
+		sort.Slice(sortedDebts, func(i, j int) bool {
+			return sortedDebts[i].Amount < sortedDebts[j].Amount
+		})
+	} else {
+		sort.Slice(sortedDebts, func(i, j int) bool {
+			return sortedDebts[i].InterestRate > sortedDebts[j].InterestRate
+		})
+	}
+
+	builder.WriteString(fmt.Sprintf("\n\nCon %s, el orden de pago es:\n", strategyName))
+	for i, debt := range sortedDebts {
+		builder.WriteString(fmt.Sprintf("%d. %s: %s (%.2f%% anual)\n",
+			i+1, debt.Name, formatCurrency(debt.Amount), debt.InterestRate))
+	}
+
+	// Comparación si existe
+	if comparison != nil {
+		builder.WriteString(s.buildComparisonText(strategy, comparison, months))
+	}
+
+	builder.WriteString(fmt.Sprintf("\n\nRecomendación: %s", strategyTip))
+
+	return builder.String()
+}
+
+func (s *DebtExitService) buildComparisonText(strategy string, comparison *domain.Comparison, monthsToPayoff int) string {
+	monthsDiff := comparison.Savings.MonthsSaved
+	interestSaved := comparison.Savings.InterestSaved
+	var text string
+
+	if strategy == "snowball" {
+		if interestSaved > 0 {
+			if monthsDiff > 0 {
+				text = fmt.Sprintf("\n\nComparado con Avalanche, pagarás %s más en intereses y tomará %d meses más, pero ofrece mayor motivación psicológica.",
+					formatCurrency(interestSaved), monthsDiff)
+			} else if monthsDiff < 0 {
+				text = fmt.Sprintf("\n\nComparado con Avalanche, terminarás %d meses antes pero pagarás %s más en intereses. Esto ocurre porque pagar deudas pequeñas primero libera capital más rápido, aunque puede resultar en un costo total mayor.",
+					-monthsDiff, formatCurrency(interestSaved))
+			} else {
+				text = fmt.Sprintf("\n\nComparado con Avalanche, pagarás %s más en intereses en el mismo tiempo, pero con mayor motivación psicológica.",
+					formatCurrency(interestSaved))
+			}
+		} else {
+			if monthsDiff > 0 {
+				text = fmt.Sprintf("\n\nComparado con Avalanche, pagarás los mismos intereses pero tomará %d meses más, aunque ofrece mayor motivación psicológica.",
+					monthsDiff)
+			} else if monthsDiff < 0 {
+				text = fmt.Sprintf("\n\nComparado con Avalanche, pagarás los mismos intereses y terminarás %d meses antes, combinando motivación con eficiencia temporal.",
+					-monthsDiff)
+			}
+		}
+	} else {
+		if interestSaved > 0 {
+			if monthsDiff > 0 {
+				text = fmt.Sprintf("\n\nComparado con Snowball, ahorrarás %s en intereses y terminarás %d meses antes, minimizando tu costo financiero total.",
+					formatCurrency(interestSaved), monthsDiff)
+			} else if monthsDiff < 0 {
+				text = fmt.Sprintf("\n\nComparado con Snowball, ahorrarás %s en intereses aunque tomará %d meses más. Esto ocurre porque priorizar deudas con mayor interés minimiza el costo total, aunque puede tomar más tiempo.",
+					formatCurrency(interestSaved), -monthsDiff)
+			} else {
+				text = fmt.Sprintf("\n\nComparado con Snowball, ahorrarás %s en intereses en el mismo tiempo, optimizando el costo financiero.",
+					formatCurrency(interestSaved))
+			}
+		} else {
+			if monthsDiff > 0 {
+				text = fmt.Sprintf("\n\nComparado con Snowball, pagarás los mismos intereses y terminarás %d meses antes, minimizando el tiempo total.",
+					monthsDiff)
+			} else if monthsDiff < 0 {
+				text = fmt.Sprintf("\n\nComparado con Snowball, pagarás los mismos intereses pero tomará %d meses más, aunque minimiza el costo financiero.",
+					-monthsDiff)
+			}
+		}
+	}
+
+	return text
 }

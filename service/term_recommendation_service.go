@@ -11,13 +11,11 @@ import (
 
 type TermRecommendationService struct {
 	loanService *LoanService
-	aiService   *AIService
 }
 
 func NewTermRecommendationService(loanService *LoanService) *TermRecommendationService {
 	return &TermRecommendationService{
 		loanService: loanService,
-		aiService:   NewAIService(),
 	}
 }
 
@@ -103,49 +101,25 @@ func (s *TermRecommendationService) RecommendTerm(
 
 	recommendedTerm := recommendations[0].TermMonths
 
-	// Generar explicación inteligente con IA para la recomendación principal
-	topRecommendation := recommendations[0]
-	alternativeTerms := []AlternativeTerm{}
-
-	// Agregar algunas alternativas para contexto
-	maxAlternatives := 3
-	for i := 1; i < len(recommendations) && i <= maxAlternatives; i++ {
-		alternativeTerms = append(alternativeTerms, AlternativeTerm{
-			Term:           recommendations[i].TermMonths,
-			MonthlyPayment: recommendations[i].MonthlyPayment,
-			TotalInterest:  recommendations[i].TotalInterest,
-		})
-	}
-
-	// Generar explicación de IA para la recomendación principal
-	aiExplanation := s.aiService.GenerateTermRecommendationExplanation(
-		input.Amount,
-		input.InterestRate,
-		topRecommendation.TermMonths,
-		topRecommendation.MonthlyPayment,
-		topRecommendation.TotalInterest,
-		input.Preference,
-		alternativeTerms,
-	)
-
-	// Actualizar la razón de la recomendación principal con la explicación de IA
-	recommendations[0].Reason = aiExplanation
-
-	// Generar explicaciones de IA para las recomendaciones alternativas principales (hasta 3 más)
-	maxAIAlternatives := 3
-	for i := 1; i < len(recommendations) && i <= maxAIAlternatives; i++ {
-		altExplanation := s.aiService.GenerateAlternativeTermExplanation(
-			input.Amount,
-			input.InterestRate,
-			recommendations[i].TermMonths,
-			recommendations[i].MonthlyPayment,
-			recommendations[i].TotalInterest,
-			input.Preference,
-			topRecommendation.TermMonths,
-			topRecommendation.MonthlyPayment,
-			topRecommendation.TotalInterest,
-		)
-		recommendations[i].Reason = altExplanation
+	// Generar explicaciones para todas las recomendaciones
+	for i := range recommendations {
+		if i == 0 {
+			recommendations[i].Reason = s.generateTermExplanation(
+				input.Amount,
+				recommendations[i].TermMonths,
+				recommendations[i].MonthlyPayment,
+				recommendations[i].TotalInterest,
+				input.Preference,
+			)
+		} else {
+			recommendations[i].Reason = s.generateTermExplanation(
+				input.Amount,
+				recommendations[i].TermMonths,
+				recommendations[i].MonthlyPayment,
+				recommendations[i].TotalInterest,
+				input.Preference,
+			)
+		}
 	}
 
 	return domain.TermRecommendationResult{
@@ -204,4 +178,28 @@ func (s *TermRecommendationService) generateReason(
 		return "Balance óptimo entre pago mensual y costo total"
 	}
 	return "Recomendación basada en los parámetros proporcionados"
+}
+
+func (s *TermRecommendationService) generateTermExplanation(
+	amount float64,
+	term int,
+	monthlyPayment, totalInterest float64,
+	preference string,
+) string {
+	totalCost := amount + totalInterest
+	totalInterestFormatted := formatCurrency(totalInterest)
+	monthlyPaymentFormatted := formatCurrency(monthlyPayment)
+	totalCostFormatted := formatCurrency(totalCost)
+
+	switch preference {
+	case "minimize_interest":
+		return fmt.Sprintf("Este plazo de %d meses minimiza el costo total de intereses (%s), aunque requiere una cuota mensual de %s. El costo total del préstamo será %s. Esta opción es ideal si tu prioridad es reducir el costo financiero total en el mercado crediticio nicaragüense.",
+			term, totalInterestFormatted, monthlyPaymentFormatted, totalCostFormatted)
+	case "minimize_payment":
+		return fmt.Sprintf("Este plazo de %d meses minimiza tu cuota mensual a %s, proporcionando mayor flexibilidad presupuestaria. Pagarás %s en intereses para un costo total de %s. Ideal para préstamos personales cuando necesitas maximizar tu capacidad de pago mensual.",
+			term, monthlyPaymentFormatted, totalInterestFormatted, totalCostFormatted)
+	default:
+		return fmt.Sprintf("Este plazo de %d meses ofrece un balance óptimo entre cuota mensual (%s) y costo total de intereses (%s). El costo total del préstamo será %s. Esta recomendación equilibra tu capacidad de pago mensual con el costo financiero total en el contexto nicaragüense.",
+			term, monthlyPaymentFormatted, totalInterestFormatted, totalCostFormatted)
+	}
 }

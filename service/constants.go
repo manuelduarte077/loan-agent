@@ -18,9 +18,6 @@ const (
 	MaxTermRangeMonths = 120 // máximo rango de términos a evaluar (10 años)
 )
 
-// GetUSDToNIORate gets the exchange rate from USD to NIO
-// Can be configured via USD_TO_NIO_RATE environment variable
-// Default is 36.5 NIO per USD
 func GetUSDToNIORate() float64 {
 	if envRate := os.Getenv("USD_TO_NIO_RATE"); envRate != "" {
 		if parsedRate := parseFloat(envRate); parsedRate > 0 {
@@ -38,4 +35,9 @@ func parseFloat(s string) float64 {
 		return 0
 	}
 	return result
+}
+
+func formatCurrency(amount float64) string {
+	nioAmount := amount * GetUSDToNIORate()
+	return fmt.Sprintf("$%.2f USD (C$%.2f NIO)", amount, nioAmount)
 }
