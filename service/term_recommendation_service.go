@@ -105,26 +105,19 @@ func (s *TermRecommendationService) RecommendTerm(
 
 	// Generar explicación inteligente con IA para la recomendación principal
 	topRecommendation := recommendations[0]
-	alternativeTerms := []struct {
-		Term           int
-		MonthlyPayment float64
-		TotalInterest  float64
-	}{}
+	alternativeTerms := []AlternativeTerm{}
 
 	// Agregar algunas alternativas para contexto
 	maxAlternatives := 3
 	for i := 1; i < len(recommendations) && i <= maxAlternatives; i++ {
-		alternativeTerms = append(alternativeTerms, struct {
-			Term           int
-			MonthlyPayment float64
-			TotalInterest  float64
-		}{
+		alternativeTerms = append(alternativeTerms, AlternativeTerm{
 			Term:           recommendations[i].TermMonths,
 			MonthlyPayment: recommendations[i].MonthlyPayment,
 			TotalInterest:  recommendations[i].TotalInterest,
 		})
 	}
 
+	// Generar explicación de IA para la recomendación principal
 	aiExplanation := s.aiService.GenerateTermRecommendationExplanation(
 		input.Amount,
 		input.InterestRate,
@@ -137,6 +130,23 @@ func (s *TermRecommendationService) RecommendTerm(
 
 	// Actualizar la razón de la recomendación principal con la explicación de IA
 	recommendations[0].Reason = aiExplanation
+
+	// Generar explicaciones de IA para las recomendaciones alternativas principales (hasta 3 más)
+	maxAIAlternatives := 3
+	for i := 1; i < len(recommendations) && i <= maxAIAlternatives; i++ {
+		altExplanation := s.aiService.GenerateAlternativeTermExplanation(
+			input.Amount,
+			input.InterestRate,
+			recommendations[i].TermMonths,
+			recommendations[i].MonthlyPayment,
+			recommendations[i].TotalInterest,
+			input.Preference,
+			topRecommendation.TermMonths,
+			topRecommendation.MonthlyPayment,
+			topRecommendation.TotalInterest,
+		)
+		recommendations[i].Reason = altExplanation
+	}
 
 	return domain.TermRecommendationResult{
 		RecommendedTerm: recommendedTerm,

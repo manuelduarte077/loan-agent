@@ -121,36 +121,18 @@ func (s *DebtExitService) CalculateDebtExitPlan(
 	}
 
 	// Generar explicación inteligente con IA
-	debtInfo := make([]struct {
-		Name         string
-		Amount       float64
-		InterestRate float64
-	}, len(input.Debts))
+	debtInfo := make([]DebtInfo, len(input.Debts))
 	for i, debt := range input.Debts {
-		debtInfo[i] = struct {
-			Name         string
-			Amount       float64
-			InterestRate float64
-		}{
+		debtInfo[i] = DebtInfo{
 			Name:         debt.Name,
 			Amount:       debt.Amount,
 			InterestRate: debt.InterestRate,
 		}
 	}
 
-	var comparisonData *struct {
-		SnowballInterest  float64
-		AvalancheInterest float64
-		InterestSaved     float64
-		MonthsSaved       int
-	}
+	var comparisonData *StrategyComparison
 	if result.Comparison != nil {
-		comparisonData = &struct {
-			SnowballInterest  float64
-			AvalancheInterest float64
-			InterestSaved     float64
-			MonthsSaved       int
-		}{
+		comparisonData = &StrategyComparison{
 			SnowballInterest:  result.Comparison.Snowball.TotalInterestPaid,
 			AvalancheInterest: result.Comparison.Avalanche.TotalInterestPaid,
 			InterestSaved:     result.Comparison.Savings.InterestSaved,

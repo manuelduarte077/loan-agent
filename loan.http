@@ -50,5 +50,5 @@ content-type: application/json
     }
   ],
   "AvailableMonthlyPayment": 800.0,
-  "Strategy": "avalanche"
+  "Strategy": "snowball"
 }
