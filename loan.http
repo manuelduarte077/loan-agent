@@ -32,7 +32,7 @@ content-type: application/json
   "Debts": [
     {
       "Name": "Tarjeta de Crédito A",
-      "Amount": 5000.0,
+      "Amount": 9000.0,
       "InterestRate": 18.0,
       "MinimumPayment": 150.0
     },
