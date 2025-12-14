@@ -25,7 +25,6 @@ func (h *TermRecommendationHandler) RecommendTerm(w http.ResponseWriter, r *http
 		return
 	}
 
-	// Validar Content-Type
 	contentType := r.Header.Get("Content-Type")
 	if !strings.Contains(contentType, "application/json") {
 		http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
@@ -46,7 +45,6 @@ func (h *TermRecommendationHandler) RecommendTerm(w http.ResponseWriter, r *http
 		return
 	}
 
-	// Codificar JSON en buffer primero para evitar escribir header si falla
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(result); err != nil {
 		log.Printf("Error encoding response: %v", err)
@@ -59,4 +57,3 @@ func (h *TermRecommendationHandler) RecommendTerm(w http.ResponseWriter, r *http
 		log.Printf("Error writing response: %v", err)
 	}
 }
-

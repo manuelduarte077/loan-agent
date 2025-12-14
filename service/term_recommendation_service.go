@@ -26,7 +26,6 @@ func (s *TermRecommendationService) RecommendTerm(
 	input domain.TermRecommendationInput,
 ) (domain.TermRecommendationResult, error) {
 
-	// Validaciones
 	if input.Amount <= 0 {
 		return domain.TermRecommendationResult{}, errors.New("monto inválido")
 	}
@@ -82,7 +81,7 @@ func (s *TermRecommendationService) RecommendTerm(
 
 		// Calcular score según preferencia
 		score := s.calculateScore(result, input, term)
-		reason := s.generateReason(result, input, term)
+		reason := s.generateReason(input)
 
 		recommendations = append(recommendations, domain.TermRecommendation{
 			TermMonths:     term,
@@ -184,9 +183,7 @@ func (s *TermRecommendationService) calculateScore(
 }
 
 func (s *TermRecommendationService) generateReason(
-	result domain.LoanResult,
 	input domain.TermRecommendationInput,
-	term int,
 ) string {
 	switch input.Preference {
 	case "minimize_interest":

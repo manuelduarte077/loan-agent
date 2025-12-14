@@ -1,0 +1,54 @@
+### POST
+POST http://localhost:8080/loan/calculate
+content-type: application/json
+
+{
+  "Amount": 100000.0,
+  "InterestRate": 5.5,
+  "TermMonths": 12
+}
+
+
+### POST
+
+POST http://localhost:8080/loan/recommend-term
+content-type: application/json
+
+{
+  "Amount": 100000.0,
+  "InterestRate": 5.5,
+  "MinTermMonths": 6,
+  "MaxTermMonths": 60,
+  "MaxMonthlyPayment": 10000.0,
+  "Preference": "minimize_interest"
+}
+
+
+### POST
+POST http://localhost:8080/loan/debt-exit-plan
+content-type: application/json
+
+{
+  "Debts": [
+    {
+      "Name": "Tarjeta de Crédito A",
+      "Amount": 5000.0,
+      "InterestRate": 18.0,
+      "MinimumPayment": 150.0
+    },
+    {
+      "Name": "Préstamo Personal",
+      "Amount": 10000.0,
+      "InterestRate": 12.0,
+      "MinimumPayment": 300.0
+    },
+    {
+      "Name": "Tarjeta de Crédito B",
+      "Amount": 3000.0,
+      "InterestRate": 22.0,
+      "MinimumPayment": 100.0
+    }
+  ],
+  "AvailableMonthlyPayment": 800.0,
+  "Strategy": "avalanche"
+}

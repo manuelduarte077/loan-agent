@@ -9,7 +9,6 @@ import (
 
 // extractClientIP extrae la IP del cliente de la request, considerando proxies
 func extractClientIP(r *http.Request) string {
-	// Intentar obtener IP de headers de proxy
 	forwardedFor := r.Header.Get("X-Forwarded-For")
 	if forwardedFor != "" {
 		ips := strings.Split(forwardedFor, ",")
@@ -29,10 +28,8 @@ func extractClientIP(r *http.Request) string {
 		}
 	}
 
-	// Fallback a RemoteAddr
 	ip, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		// Si SplitHostPort falla, intentar usar RemoteAddr directamente
 		if net.ParseIP(r.RemoteAddr) != nil {
 			return r.RemoteAddr
 		}

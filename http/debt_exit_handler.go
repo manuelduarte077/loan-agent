@@ -25,7 +25,6 @@ func (h *DebtExitHandler) CalculateDebtExitPlan(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Validar Content-Type
 	contentType := r.Header.Get("Content-Type")
 	if !strings.Contains(contentType, "application/json") {
 		http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)

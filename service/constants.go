@@ -10,6 +10,5 @@ const (
 	MaxDebtPayoffMonths  = 600           // 50 años máximo para pagar deudas
 	DebtBalanceTolerance = 0.01          // tolerancia para considerar deuda pagada
 
-	// Límites de términos para recomendación
 	MaxTermRangeMonths = 120 // máximo rango de términos a evaluar (10 años)
 )

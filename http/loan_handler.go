@@ -25,7 +25,6 @@ func (h *LoanHandler) CalculateLoan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validar Content-Type
 	contentType := r.Header.Get("Content-Type")
 	if !strings.Contains(contentType, "application/json") {
 		http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)

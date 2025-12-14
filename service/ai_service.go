@@ -214,7 +214,6 @@ func (s *AIService) formatComparison(comparison *struct {
 	if comparison == nil {
 		return ""
 	}
-	// Nota: Los meses se calculan separadamente en el servicio de deudas
 	return fmt.Sprintf(`Comparación:
 - Método Snowball: $%.2f en intereses
 - Método Avalanche: $%.2f en intereses

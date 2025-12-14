@@ -27,7 +27,6 @@ func (s *DebtExitService) CalculateDebtExitPlan(
 	input domain.DebtExitInput,
 ) (domain.DebtExitResult, error) {
 
-	// Validaciones
 	if len(input.Debts) == 0 {
 		return domain.DebtExitResult{}, errors.New("no se proporcionaron deudas")
 	}
@@ -93,11 +92,9 @@ func (s *DebtExitService) CalculateDebtExitPlan(
 	var comparison *domain.Comparison
 
 	if input.Strategy == "compare" {
-		// Calcular ambos métodos y comparar
 		snowballResult := s.calculateStrategy(input, "snowball")
 		avalancheResult := s.calculateStrategy(input, "avalanche")
 
-		// Usar el mejor método como resultado principal
 		if avalancheResult.TotalInterestPaid < snowballResult.TotalInterestPaid {
 			result = avalancheResult
 		} else {
@@ -182,20 +179,16 @@ func (s *DebtExitService) calculateStrategy(
 	debts := make([]domain.Debt, len(input.Debts))
 	copy(debts, input.Debts)
 
-	// Ordenar según estrategia
 	if strategy == "snowball" {
-		// Ordenar por monto ascendente
 		sort.Slice(debts, func(i, j int) bool {
 			return debts[i].Amount < debts[j].Amount
 		})
 	} else {
-		// Ordenar por tasa de interés descendente
 		sort.Slice(debts, func(i, j int) bool {
 			return debts[i].InterestRate > debts[j].InterestRate
 		})
 	}
 
-	// Crear mapa de balances restantes
 	balances := make(map[string]float64)
 	for _, debt := range debts {
 		balances[debt.Name] = debt.Amount
@@ -212,7 +205,6 @@ func (s *DebtExitService) calculateStrategy(
 		payments := []domain.MonthlyPayment{}
 		totalPaid := 0.0
 
-		// Primera pasada: calcular intereses y pagar mínimos de todas las deudas activas
 		interestMap := make(map[string]float64)
 		for _, debt := range debts {
 			if balances[debt.Name] <= 0 {
@@ -247,7 +239,7 @@ func (s *DebtExitService) calculateStrategy(
 			if payment > maxPossiblePayment {
 				payment = maxPossiblePayment
 			}
-			// No exceder el disponible
+
 			if payment > available {
 				payment = available
 			}
@@ -274,7 +266,7 @@ func (s *DebtExitService) calculateStrategy(
 			}
 		}
 
-		// Segunda pasada: aplicar excedente a la primera deuda activa según estrategia
+		// Aplicar excedente a la primera deuda activa según estrategia
 		if available > 0 {
 			for _, debt := range debts {
 				if balances[debt.Name] > 0 && available > 0 {
@@ -283,7 +275,6 @@ func (s *DebtExitService) calculateStrategy(
 						extraPayment = balances[debt.Name]
 					}
 
-					// Actualizar el pago existente
 					for i := range payments {
 						if payments[i].DebtName == debt.Name {
 							payments[i].Payment = roundTo2Decimals(payments[i].Payment + extraPayment)
@@ -328,7 +319,6 @@ func (s *DebtExitService) calculateStrategy(
 		}
 	}
 
-	// Calcular total de deuda inicial
 	totalDebt := 0.0
 	for _, debt := range input.Debts {
 		totalDebt += debt.Amount

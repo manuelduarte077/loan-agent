@@ -32,7 +32,6 @@ func (s *LoanService) CalculateLoan(
 	input domain.LoanInput,
 ) (domain.LoanResult, error) {
 
-	// Validar entrada
 	if input.Amount <= 0 {
 		return domain.LoanResult{}, errors.New("monto inválido")
 	}

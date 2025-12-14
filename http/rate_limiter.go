@@ -6,10 +6,8 @@ import (
 )
 
 const (
-	// Tiempo después del cual se elimina un bucket inactivo
 	bucketCleanupThreshold = 1 * time.Hour
-	// Intervalo para ejecutar limpieza de buckets
-	cleanupInterval = 30 * time.Minute
+	cleanupInterval        = 30 * time.Minute
 )
 
 type clientBucket struct {
@@ -18,10 +16,10 @@ type clientBucket struct {
 }
 
 type RateLimiter struct {
-	mu        sync.Mutex
-	capacity  int
-	refillDur time.Duration
-	clients   map[string]*clientBucket
+	mu          sync.Mutex
+	capacity    int
+	refillDur   time.Duration
+	clients     map[string]*clientBucket
 	stopCleanup chan struct{}
 }
 
@@ -32,12 +30,10 @@ func NewRateLimiter(capacity int, refillDur time.Duration) *RateLimiter {
 		clients:     make(map[string]*clientBucket),
 		stopCleanup: make(chan struct{}),
 	}
-	// Iniciar limpieza periódica de buckets inactivos
 	go rl.cleanupLoop()
 	return rl
 }
 
-// cleanupLoop limpia buckets inactivos periódicamente
 func (r *RateLimiter) cleanupLoop() {
 	ticker := time.NewTicker(cleanupInterval)
 	defer ticker.Stop()
@@ -52,7 +48,6 @@ func (r *RateLimiter) cleanupLoop() {
 	}
 }
 
-// cleanup elimina buckets que no han sido usados recientemente
 func (r *RateLimiter) cleanup() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -65,7 +60,6 @@ func (r *RateLimiter) cleanup() {
 	}
 }
 
-// Stop detiene la limpieza periódica (útil para tests o shutdown)
 func (r *RateLimiter) Stop() {
 	close(r.stopCleanup)
 }
